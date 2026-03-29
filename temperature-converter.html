@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TempShift — Temperature Converter</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: rgba(255,255,255,0.07);
+    --accent-cold: #4fc3f7;
+    --accent-warm: #ff7043;
+    --accent-abs: #b39ddb;
+    --text: #f0f0f8;
+    --muted: rgba(240,240,248,0.45);
+    --error: #ef5350;
+  }
+
+  html, body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(79,195,247,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79,195,247,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Glow orbs */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 700px;
+    height: 700px;
+    background: radial-gradient(ellipse at center, rgba(79,195,247,0.07) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60px 20px 80px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 56px;
+    animation: fadeDown 0.7s ease both;
+  }
+
+  .logo-badge {
+    display: inline-block;
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent-cold);
+    border: 1px solid rgba(79,195,247,0.3);
+    padding: 6px 16px;
+    border-radius: 100px;
+    margin-bottom: 24px;
+    background: rgba(79,195,247,0.05);
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(48px, 8vw, 88px);
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+
+  h1 span {
+    -webkit-text-stroke: 1px rgba(79,195,247,0.5);
+    color: transparent;
+  }
+
+  .tagline {
+    font-size: 14px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* Main card */
+  .converter-card {
+    width: 100%;
+    max-width: 560px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 36px;
+    animation: fadeUp 0.7s 0.15s ease both;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .converter-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-cold), transparent);
+    opacity: 0.4;
+  }
+
+  /* Input section */
+  .field-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  .input-wrap {
+    position: relative;
+    margin-bottom: 8px;
+  }
+
+  #temp-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 40px;
+    font-weight: 700;
+    padding: 18px 24px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  #temp-input::-webkit-inner-spin-button,
+  #temp-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+  #temp-input:focus {
+    border-color: rgba(79,195,247,0.4);
+    box-shadow: 0 0 0 3px rgba(79,195,247,0.08);
+  }
+
+  #temp-input.is-error {
+    border-color: rgba(239,83,80,0.5);
+    box-shadow: 0 0 0 3px rgba(239,83,80,0.08);
+  }
+
+  .error-msg {
+    font-size: 12px;
+    color: var(--error);
+    height: 18px;
+    margin-bottom: 20px;
+    transition: opacity 0.2s;
+    opacity: 0;
+  }
+
+  .error-msg.show { opacity: 1; }
+
+  /* Unit selector */
+  .units-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .unit-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 14px 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .unit-btn .sym {
+    display: block;
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 2px;
+    transition: color 0.2s;
+  }
+
+  .unit-btn:hover {
+    border-color: rgba(255,255,255,0.15);
+    color: var(--text);
+  }
+
+  .unit-btn.active-C { border-color: var(--accent-cold); color: var(--accent-cold); background: rgba(79,195,247,0.08); }
+  .unit-btn.active-F { border-color: var(--accent-warm); color: var(--accent-warm); background: rgba(255,112,67,0.08); }
+  .unit-btn.active-K { border-color: var(--accent-abs); color: var(--accent-abs); background: rgba(179,157,219,0.08); }
+
+  /* Convert button */
+  .convert-btn {
+    width: 100%;
+    background: var(--accent-cold);
+    border: none;
+    border-radius: 14px;
+    color: #020a12;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    padding: 18px;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.15s, box-shadow 0.2s, background 0.3s;
+    text-transform: uppercase;
+  }
+
+  .convert-btn:hover {
+    opacity: 0.92;
+    box-shadow: 0 0 32px rgba(79,195,247,0.25);
+  }
+
+  .convert-btn:active { transform: scale(0.98); }
+  .convert-btn.unit-F { background: var(--accent-warm); box-shadow: none; }
+  .convert-btn.unit-F:hover { box-shadow: 0 0 32px rgba(255,112,67,0.25); }
+  .convert-btn.unit-K { background: var(--accent-abs); box-shadow: none; }
+  .convert-btn.unit-K:hover { box-shadow: 0 0 32px rgba(179,157,219,0.25); }
+
+  /* Results */
+  .results {
+    margin-top: 28px;
+    display: none;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .results.show { display: block; }
+
+  .results-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .result-tile {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+
+  .result-tile:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.12);
+  }
+
+  .result-tile::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    border-radius: 0 0 16px 16px;
+  }
+
+  .result-tile.r-C::after { background: var(--accent-cold); }
+  .result-tile.r-F::after { background: var(--accent-warm); }
+  .result-tile.r-K::after { background: var(--accent-abs); }
+
+  .result-name {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .result-val {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .result-unit {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .result-tile.r-C .result-val { color: var(--accent-cold); }
+  .result-tile.r-F .result-val { color: var(--accent-warm); }
+  .result-tile.r-K .result-val { color: var(--accent-abs); }
+
+  /* Footer */
+  footer {
+    margin-top: 48px;
+    text-align: center;
+    font-size: 12px;
+    color: rgba(240,240,248,0.2);
+    letter-spacing: 0.05em;
+    animation: fadeUp 0.7s 0.3s ease both;
+  }
+
+  /* Animations */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    .converter-card { padding: 24px 20px; }
+    h1 { font-size: 52px; }
+    #temp-input { font-size: 32px; padding: 14px 18px; }
+    .result-val { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="logo-badge">Temperature Converter</div>
+    <h1>Temp<span>Shift</span></h1>
+    <p class="tagline">Celsius · Fahrenheit · Kelvin — instantly</p>
+  </header>
+
+  <div class="converter-card">
+
+    <label class="field-label" for="temp-input">Enter temperature</label>
+    <div class="input-wrap">
+      <input type="text" id="temp-input" placeholder="0" inputmode="decimal" autocomplete="off" />
+    </div>
+    <p class="error-msg" id="error-msg">Please enter a valid number.</p>
+
+    <label class="field-label">Input unit</label>
+    <div class="units-grid">
+      <button class="unit-btn active-C" data-unit="C" onclick="selectUnit(this)">
+        <span class="sym">°C</span>Celsius
+      </button>
+      <button class="unit-btn" data-unit="F" onclick="selectUnit(this)">
+        <span class="sym">°F</span>Fahrenheit
+      </button>
+      <button class="unit-btn" data-unit="K" onclick="selectUnit(this)">
+        <span class="sym">K</span>Kelvin
+      </button>
+    </div>
+
+    <button class="convert-btn unit-C" id="convert-btn" onclick="convert()">Convert →</button>
+
+    <div class="results" id="results">
+      <p class="results-label" style="margin-top:28px">Converted values</p>
+      <div class="results-grid" id="results-grid"></div>
+    </div>
+
+  </div>
+
+  <footer>TempShift &mdash; instant unit conversion</footer>
+
+</div>
+
+<script>
+  let unit = 'C';
+
+  const unitData = {
+    C: { name: 'Celsius', sym: '°C', colorClass: 'r-C' },
+    F: { name: 'Fahrenheit', sym: '°F', colorClass: 'r-F' },
+    K: { name: 'Kelvin', sym: 'K', colorClass: 'r-K' },
+  };
+
+  function selectUnit(btn) {
+    document.querySelectorAll('.unit-btn').forEach(b => {
+      b.className = 'unit-btn';
+    });
+    unit = btn.dataset.unit;
+    btn.classList.add('active-' + unit);
+    document.getElementById('convert-btn').className = 'convert-btn unit-' + unit;
+    clearResults();
+    clearError();
+  }
+
+  function toC(val, from) {
+    if (from === 'C') return val;
+    if (from === 'F') return (val - 32) * 5 / 9;
+    if (from === 'K') return val - 273.15;
+  }
+
+  function fromC(celsius, to) {
+    if (to === 'C') return celsius;
+    if (to === 'F') return celsius * 9 / 5 + 32;
+    if (to === 'K') return celsius + 273.15;
+  }
+
+  function fmt(val) {
+    const rounded = Math.round(val * 100) / 100;
+    return rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(2);
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-msg');
+    el.textContent = msg;
+    el.classList.add('show');
+    document.getElementById('temp-input').classList.add('is-error');
+  }
+
+  function clearError() {
+    document.getElementById('error-msg').classList.remove('show');
+    document.getElementById('temp-input').classList.remove('is-error');
+  }
+
+  function clearResults() {
+    const r = document.getElementById('results');
+    r.classList.remove('show');
+  }
+
+  function convert() {
+    clearError();
+    const raw = document.getElementById('temp-input').value.trim();
+
+    if (raw === '') { showError('Please enter a temperature first.'); return; }
+    const val = parseFloat(raw);
+    if (isNaN(val)) { showError('That doesn\'t look like a number — try something like 23 or -5.5.'); return; }
+    if (unit === 'K' && val < 0) { showError('Kelvin can\'t be negative — absolute zero is 0 K.'); return; }
+
+    const celsius = toC(val, unit);
+    const targets = ['C', 'F', 'K'].filter(u => u !== unit);
+
+    const grid = document.getElementById('results-grid');
+    grid.innerHTML = '';
+
+    targets.forEach(u => {
+      const converted = fromC(celsius, u);
+      const d = unitData[u];
+      const tile = document.createElement('div');
+      tile.className = 'result-tile ' + d.colorClass;
+      tile.innerHTML = `
+        <p class="result-name">${d.name}</p>
+        <p class="result-val">${fmt(converted)}</p>
+        <p class="result-unit">${d.sym}</p>
+      `;
+      grid.appendChild(tile);
+    });
+
+    const results = document.getElementById('results');
+    results.classList.remove('show');
+    void results.offsetWidth;
+    results.classList.add('show');
+  }
+
+  document.getElementById('temp-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') convert();
+  });
+
+  document.getElementById('temp-input').addEventListener('input', () => {
+    clearError();
+  });
+</script>
+</body>
+</html>
